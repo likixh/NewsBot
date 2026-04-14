@@ -1,4 +1,4 @@
-name: 每日早报晚报
+name: Daily Market Report
 
 on:
   workflow_dispatch:

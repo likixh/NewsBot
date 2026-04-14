@@ -1,4 +1,4 @@
-name: 新闻监控（每20分钟）
+name: News Monitor
 
 on:
   workflow_dispatch:

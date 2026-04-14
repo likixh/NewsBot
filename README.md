@@ -83,7 +83,7 @@ Groq:
 手动运行：
 
 1. 打开仓库的 **Actions** 页面
-2. 选择 **新闻监控（每20分钟）** 或 **每日早报晚报**
+2. 选择 **News Monitor** 或 **Daily Market Report**
 3. 点击 **Run workflow**
 
 开启定时运行：
@@ -212,7 +212,7 @@ This repository defaults to manual runs so forks do not immediately spend API qu
 Manual run:
 
 1. Open the repository **Actions** tab
-2. Select **新闻监控（每20分钟）** or **每日早报晚报**
+2. Select **News Monitor** or **Daily Market Report**
 3. Click **Run workflow**
 
 Enable scheduled runs:
