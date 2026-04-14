@@ -1,97 +1,266 @@
-# 📈 美股新闻监控机器人 — 部署指南
+# US Stock News Monitor Bot
 
-**全程免费，不用开一直开着电脑**
+<p align="center">
+  <a href="#中文"><kbd>中文</kbd></a>
+  <a href="#english"><kbd>English</kbd></a>
+</p>
 
----
-
-## 你需要准备的东西
-
-1. **GitHub 账号** ✅（你已有）
-2. **Google 账号** ✅（你已有）→ 用来获取 Gemini API Key
-3. **飞书** ✅（你已有）→ 用来接收推送
+An automated news monitor for US stock market signals. It collects market news from RSS sources, uses Gemini with Groq as a fallback to score market impact, and sends alerts or daily summaries to a Feishu group.
 
 ---
 
-## 第一步：获取 Gemini API Key（5分钟）
+## 中文
+
+### 功能
+
+- 监控 Reuters、SEC Filing、earnings 相关 RSS 新闻源
+- 用 Gemini 分析新闻对美股、板块、ETF、大宗商品的影响
+- Gemini 触发频率限制或失败时，自动切换到 Groq
+- 通过飞书自定义机器人推送看涨/看跌信号
+- 支持早报/晚报，汇总当天已推送信号和市场背景
+- 运行状态保存在 GitHub Actions cache，不会提交推送记录到公开仓库
+
+### 准备
+
+需要准备：
+
+- GitHub 账号，用来 fork 仓库和运行 GitHub Actions
+- Google AI Studio API key，用来调用 Gemini
+- Groq API key，用作备用 LLM 引擎
+- 飞书群聊和自定义机器人 webhook，用来接收推送
+
+### 1. Fork 仓库
+
+打开本仓库页面，点击右上角 **Fork**，把项目复制到自己的 GitHub 账号下。
+
+也可以 clone 到本地后推送到自己的仓库：
+
+```bash
+git clone https://github.com/likixh/NewsBot.git
+cd NewsBot
+```
+
+### 2. 获取 API Key
+
+Gemini:
 
 1. 打开 https://aistudio.google.com/app/apikey
-2. 点击 **"Create API key"**
-3. 复制那串 key（形如 `AIzaSy...`），**保存好，待会用**
+2. 点击 **Create API key**
+3. 保存生成的 key
 
----
+Groq:
 
-## 第二步：创建飞书机器人 Webhook（5分钟）
+1. 打开 https://console.groq.com/keys
+2. 创建 API key
+3. 保存生成的 key
 
-1. 打开飞书，进入你想接收消息的**群聊**（没有就新建一个）
-2. 点右上角 **"设置"** → **"机器人"** → **"添加机器人"**
-3. 选 **"自定义机器人"**，随便起个名字（如"美股监控"）
-4. 复制 **Webhook 地址**（形如 `https://open.feishu.cn/open-apis/bot/v2/hook/...`），**保存好**
+### 3. 创建飞书 Webhook
 
----
+1. 打开飞书群聊
+2. 进入 **设置** -> **机器人** -> **添加机器人**
+3. 选择 **自定义机器人**
+4. 复制 webhook 地址，格式类似 `https://open.feishu.cn/open-apis/bot/v2/hook/...`
 
-## 第三步：上传代码到 GitHub（10分钟）
+### 4. 配置 GitHub Secrets
 
-1. 打开 https://github.com，点右上角 **"+"** → **"New repository"**
-2. 仓库名随便起（如 `stock-news-bot`），选 **Private（私有）**，点 **"Create repository"**
-3. 点页面上的 **"uploading an existing file"**
-4. 把本压缩包里的所有文件**全部拖进去**上传
-5. 点 **"Commit changes"** 保存
+不要把任何 key 写进代码、README、issue 或 commit。把它们放到 GitHub Secrets：
 
----
-
-## 第四步：配置密钥（最重要！3分钟）
-
-> ⚠️ 密钥绝对不能直接写在代码里，要存在 GitHub Secrets
-
-1. 在你的仓库页面，点 **"Settings"**（设置）
-2. 左边菜单找 **"Secrets and variables"** → **"Actions"**
-3. 点 **"New repository secret"**，添加以下三个：
+1. 打开 fork 后的仓库
+2. 进入 **Settings** -> **Secrets and variables** -> **Actions**
+3. 点击 **New repository secret**
+4. 添加：
 
 | Name | Value |
-|------|-------|
-| `GEMINI_API_KEY` | 第一步复制的 Gemini Key |
-| `FEISHU_WEBHOOK_URL` | 第二步复制的飞书 Webhook 地址 |
-| `GROQ_API_KEY` | Groq API Key，用作 Gemini 频率限制时的备用引擎 |
+| --- | --- |
+| `GEMINI_API_KEY` | Gemini API key |
+| `GROQ_API_KEY` | Groq API key |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人 webhook |
 
-> 这些值只放在 GitHub Secrets 里，不要写进代码、README、issue 或 commit。
+### 5. 运行 Workflow
+
+本仓库默认只保留手动运行，避免 fork 后立刻自动消耗 API 额度。
+
+手动运行：
+
+1. 打开仓库的 **Actions** 页面
+2. 选择 **新闻监控（每20分钟）** 或 **每日早报晚报**
+3. 点击 **Run workflow**
+
+开启定时运行：
+
+在 `.github/workflows/monitor.yml` 里加回 cron：
+
+```yaml
+on:
+  schedule:
+    - cron: '0,20,40 16-23 * * *'
+    - cron: '0,20,40 0-4 * * *'
+  workflow_dispatch:
+```
+
+在 `.github/workflows/daily_report.yml` 里加回早晚报 cron：
+
+```yaml
+on:
+  schedule:
+    - cron: '0 17 * * *'
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+```
+
+GitHub Actions 使用 UTC 时间。上面的示例大致覆盖美股盘中和盘后时段，使用前请按自己的时区调整。
+
+### 配置
+
+常用配置在 `config.py`：
+
+- `PUSH_SCORE_MAX`：看跌推送阈值上限
+- `PUSH_BULLISH_MIN`：看涨推送阈值下限
+- `ALLOWED_SOURCES`：允许的新闻来源关键词
+- `BLOCKED_SOURCES`：排除的新闻来源关键词
+- `MAX_SEEN_IDS`：去重历史保留数量
+
+### 状态文件
+
+`seen_ids.json` 和 `today_pushed.json` 是运行时状态文件。它们会在 Actions 运行时生成，并通过 Actions cache 保存。
+
+这些文件已被 `.gitignore` 忽略，不会提交到公开仓库。
+
+### 安全
+
+- 不要提交 `.env`、API key、webhook URL 或任何私钥
+- 建议开启 GitHub Secret Scanning 和 Push Protection
+- 如果 key 曾经被提交过，立即在对应平台 revoke 并重新生成
+
+### License
+
+MIT License.
 
 ---
 
-## 第五步：启用 GitHub Actions（2分钟）
+## English
 
-1. 在仓库页面点 **"Actions"** 标签
-2. 如果看到提示"Workflows aren't running"，点 **"I understand my workflows, enable them"**
-3. 你会看到两个 workflow：
-   - **新闻监控（每20分钟）** — 实时推送
-   - **每日早报晚报** — 8:00和20:00推送
-4. 点任意一个 workflow → 点 **"Run workflow"** → **"Run workflow"** 手动测试一下
+### Features
 
----
+- Monitors Reuters, SEC filing, and earnings-related RSS feeds
+- Uses Gemini to analyze market impact across stocks, sectors, ETFs, and commodities
+- Falls back to Groq when Gemini is rate-limited or unavailable
+- Sends bullish and bearish alerts to a Feishu group bot
+- Generates morning and evening market summaries
+- Keeps runtime state in GitHub Actions cache instead of committing alert history to the public repository
 
-## 验证是否成功
+### Requirements
 
-- 手动触发后，等1-2分钟，飞书应该收到消息
-- 如果没收到，点 Actions 页面那次运行记录，看红色错误提示
+You need:
 
----
+- A GitHub account for forking the repository and running GitHub Actions
+- A Google AI Studio API key for Gemini
+- A Groq API key as the fallback LLM provider
+- A Feishu group and custom bot webhook for receiving alerts
 
-## 常见问题
+### 1. Fork The Repository
 
-**Q：GitHub Actions 每月免费额度够用吗？**
-A：完全够。每20分钟跑一次，每次约30秒，一个月约 `72次/天 × 30天 × 0.5分钟 = 1080分钟`，免费额度是2000分钟，绰绰有余。
+Open this repository on GitHub and click **Fork**.
 
-**Q：Gemini 免费额度够用吗？**
-A：够。每天最多1500次请求，你实际用不到800次。
+You can also clone it locally:
 
-**Q：如何调整推送的严格程度？**
-A：修改 `config.py` 里的 `PUSH_BULLISH_MIN`（看涨阈值）和 `PUSH_SCORE_MAX`（看跌阈值）。
+```bash
+git clone https://github.com/likixh/NewsBot.git
+cd NewsBot
+```
 
-**Q：如何增加或减少监控的新闻来源？**
-A：修改 `config.py` 里的 `ALLOWED_SOURCES` 和 `BLOCKED_SOURCES` 列表。
+### 2. Get API Keys
 
-**Q：仓库公开后会暴露我的推送记录吗？**
-A：不会。运行状态保存在 GitHub Actions cache 里，`seen_ids.json` 和 `today_pushed.json` 不再提交到仓库。
+Gemini:
 
----
+1. Open https://aistudio.google.com/app/apikey
+2. Click **Create API key**
+3. Save the generated key
 
-> 💡 提示：第一次部署后，建议观察1-2天，根据实际收到的消息量调整 `config.py` 里的阈值。
+Groq:
+
+1. Open https://console.groq.com/keys
+2. Create an API key
+3. Save the generated key
+
+### 3. Create A Feishu Webhook
+
+1. Open a Feishu group chat
+2. Go to **Settings** -> **Bots** -> **Add Bot**
+3. Select **Custom Bot**
+4. Copy the webhook URL, which looks like `https://open.feishu.cn/open-apis/bot/v2/hook/...`
+
+### 4. Configure GitHub Secrets
+
+Never put keys in code, README files, issues, or commits. Store them in GitHub Secrets:
+
+1. Open your forked repository
+2. Go to **Settings** -> **Secrets and variables** -> **Actions**
+3. Click **New repository secret**
+4. Add:
+
+| Name | Value |
+| --- | --- |
+| `GEMINI_API_KEY` | Gemini API key |
+| `GROQ_API_KEY` | Groq API key |
+| `FEISHU_WEBHOOK_URL` | Feishu bot webhook |
+
+### 5. Run Workflows
+
+This repository defaults to manual runs so forks do not immediately spend API quota.
+
+Manual run:
+
+1. Open the repository **Actions** tab
+2. Select **新闻监控（每20分钟）** or **每日早报晚报**
+3. Click **Run workflow**
+
+Enable scheduled runs:
+
+Add cron back to `.github/workflows/monitor.yml`:
+
+```yaml
+on:
+  schedule:
+    - cron: '0,20,40 16-23 * * *'
+    - cron: '0,20,40 0-4 * * *'
+  workflow_dispatch:
+```
+
+Add morning and evening report cron to `.github/workflows/daily_report.yml`:
+
+```yaml
+on:
+  schedule:
+    - cron: '0 17 * * *'
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+```
+
+GitHub Actions uses UTC. Adjust the schedule for your own timezone and market window.
+
+### Configuration
+
+Common settings live in `config.py`:
+
+- `PUSH_SCORE_MAX`: upper threshold for bearish alerts
+- `PUSH_BULLISH_MIN`: lower threshold for bullish alerts
+- `ALLOWED_SOURCES`: allowed source keywords
+- `BLOCKED_SOURCES`: blocked source keywords
+- `MAX_SEEN_IDS`: deduplication history size
+
+### Runtime State
+
+`seen_ids.json` and `today_pushed.json` are runtime state files. They are created during workflow runs and stored via GitHub Actions cache.
+
+They are ignored by `.gitignore` and are not committed to the public repository.
+
+### Security
+
+- Do not commit `.env` files, API keys, webhook URLs, or private keys
+- Enable GitHub Secret Scanning and Push Protection
+- If a key was ever committed, revoke it and generate a new one
+
+### License
+
+MIT License.
