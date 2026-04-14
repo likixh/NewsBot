@@ -1,0 +1,6 @@
+[allowlist]
+description = "Allow documented placeholder examples only"
+regexes = [
+  '''AIzaSy\.\.\.''',
+  '''https://open\.feishu\.cn/open-apis/bot/v2/hook/\.\.\.''',
+]

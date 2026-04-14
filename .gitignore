@@ -1,0 +1,11 @@
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+__pycache__/
+.venv/
+.gstack/
+seen_ids.json
+today_pushed.json

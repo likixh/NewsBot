@@ -1,0 +1,60 @@
+name: 新闻监控（每20分钟）
+
+on:
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 恢复状态文件
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            seen_ids.json
+            today_pushed.json
+          key: newsbot-state-${{ github.run_id }}
+          restore-keys: |
+            newsbot-state-
+
+      - name: 确保状态文件存在
+        run: |
+          test -f seen_ids.json || echo '{"ids": []}' > seen_ids.json
+          test -f today_pushed.json || echo '[]' > today_pushed.json
+
+      - run: pip install -r requirements.txt
+
+      - name: 运行新闻监控
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          HOUR=$(date -u +%H)
+          EVENT="${{ github.event_name }}"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "手动触发，直接运行"
+            python main.py
+          elif [ "$HOUR" -ge 16 ] || [ "$HOUR" -le 4 ]; then
+            python main.py
+          else
+            echo "当前时间 UTC $HOUR:00，不在监控时间窗口内，跳过"
+          fi
+
+      - name: 保存状态文件
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            seen_ids.json
+            today_pushed.json
+          key: newsbot-state-${{ github.run_id }}
